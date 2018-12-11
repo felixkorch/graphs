@@ -1,0 +1,53 @@
+<html>
+<header>
+    <title>Charts</title>
+    <meta charset="utf-8"/>
+    <script src="src/index.js"></script>
+    
+</header>
+<body>
+    <button type="button" onclick="handleClick()">Add point</button>
+    <div id="container" style="width: 800px; height: 400px; border: 1px solid black" />
+</body>
+</html>
+
+<script>
+
+    var points = [];
+    points.push({ "key": "a", "value": 0 });
+    points.push({ "key": "b", "value": 70 });
+    points.push({ "key": "c", "value": 200 });
+    points.push({ "key": "d", "value": 30 });
+    points.push({ "key": "e", "value": 20 });
+    points.push({ "key": "f", "value": 10 });
+    points.push({ "key": "g", "value": 10 });
+    points.push({ "key": "h", "value": 20 });
+    points.push({ "key": "h", "value": 240 });
+    points.push({ "key": "h", "value": 50 });
+    points.push({ "key": "h", "value": 10 });
+    points.push({ "key": "f", "value": 10 });
+    points.push({ "key": "g", "value": 0 });
+    points.push({ "key": "h", "value": 20 });
+    points.push({ "key": "h", "value": 20 });
+    points.push({ "key": "h", "value": 50 });
+    points.push({ "key": "h", "value": 10 });
+    points.push({ "key": "h", "value": 20 });
+    points.push({ "key": "h", "value": 50 });
+    points.push({ "key": "h", "value": 10 });
+    points.push({ "key": "h", "value": 20 });
+    points.push({ "key": "h", "value": 50 });
+    points.push({ "key": "h", "value": 10 });
+    points.push({ "key": "h", "value": 20 });
+    points.push({ "key": "h", "value": 70 });
+    points.push({ "key": "h", "value": 90 });
+
+    var chart = new graphy.StepLineChart("container");
+    chart.graphProps = { "stroke": "#67B6DB", "strokeWidth": 2 };
+    chart.data = points;
+    chart.draw(); 
+
+    function handleClick() {
+        chart.addPoint({ "key": "a", "value": 280 }, 0);
+    }
+
+</script>
