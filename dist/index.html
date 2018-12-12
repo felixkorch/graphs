@@ -16,7 +16,7 @@
     var points = [];
     points.push({ "key": "a", "value": 0 });
     points.push({ "key": "b", "value": 70 });
-    points.push({ "key": "c", "value": 200 });
+    points.push({ "key": "c", "value": 300 });
     points.push({ "key": "d", "value": 30 });
     points.push({ "key": "e", "value": 20 });
     points.push({ "key": "f", "value": 10 });
@@ -24,9 +24,9 @@
     points.push({ "key": "h", "value": 20 });
     points.push({ "key": "h", "value": 240 });
     points.push({ "key": "h", "value": 50 });
-    points.push({ "key": "h", "value": 10 });
+    points.push({ "key": "h", "value": 70 });
     points.push({ "key": "f", "value": 10 });
-    points.push({ "key": "g", "value": 0 });
+    points.push({ "key": "g", "value": 500 });
     points.push({ "key": "h", "value": 20 });
     points.push({ "key": "h", "value": 20 });
     points.push({ "key": "h", "value": 50 });
@@ -41,13 +41,17 @@
     points.push({ "key": "h", "value": 70 });
     points.push({ "key": "h", "value": 90 });
 
-    var chart = new graphy.StepLineChart("container");
-    chart.graphProps = { "stroke": "#67B6DB", "strokeWidth": 2 };
-    chart.data = points;
+    var chart = new xycharts.StepLineChart("container");
+    var dataset = chart.createDataSet();
+    dataset.data = points;
+    dataset.properties.pathProperties = { "stroke": "#67B6DB", "strokeWidth": 2 };
+    dataset.xKey = "key";
+    dataset.yKey = "value";
     chart.draw(); 
 
     function handleClick() {
-        chart.addPoint({ "key": "a", "value": 280 }, 0);
+        dataset.addData({ "key": "a", "value": Math.random() * 500 }, 1);
+        chart.draw();
     }
 
 </script>

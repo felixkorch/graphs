@@ -11,8 +11,8 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-var graphy;
-(function (graphy) {
+var xycharts;
+(function (xycharts) {
     var WHITE = "#FFFFFF";
     var RED = "#FF0000";
     var BLUE = "#0000FF";
@@ -42,38 +42,87 @@ var graphy;
         }
         return PathProperties;
     }());
+    var Properties = /** @class */ (function () {
+        function Properties() {
+        }
+        return Properties;
+    }());
+    var DataSet = /** @class */ (function () {
+        function DataSet(data) {
+            this.data = data ? data : [];
+            this.properties = new Properties();
+            this.xKey = '';
+            this.yKey = '';
+        }
+        DataSet.prototype.addData = function (item, remove) {
+            this.data.splice(0, remove);
+            this.data.push(item);
+        };
+        DataSet.prototype.bounds = function () {
+            if (!this.data)
+                return { min: 0, max: 0 };
+            var values = this.data.map(function (e) { return e.value; });
+            var max = Math.max.apply(Math, values);
+            var min = Math.min.apply(Math, values);
+            return { min: min, max: max };
+        };
+        return DataSet;
+    }());
+    xycharts.DataSet = DataSet;
+    var PathType;
+    (function (PathType) {
+        PathType[PathType["MOVETO"] = 0] = "MOVETO";
+        PathType[PathType["LINETO"] = 1] = "LINETO";
+        PathType[PathType["LINEH"] = 2] = "LINEH";
+        PathType[PathType["LINEV"] = 3] = "LINEV";
+    })(PathType || (PathType = {}));
     var Path = /** @class */ (function (_super) {
         __extends(Path, _super);
-        function Path(id, pathProperties, path) {
+        function Path(id, pathProperties) {
             var _this = _super.call(this, id) || this;
-            _this.path = path ? path : '';
             _this.pathProperties = pathProperties ? pathProperties : new PathProperties();
-            _this.coordinates = [];
             _this.currentPos = [0, 0];
+            _this.dataPoints = [];
             return _this;
         }
+        Path.prototype.typeString = function (type, coords) {
+            switch (type) {
+                case PathType.MOVETO: return 'M ' + coords[0] + ' ' + coords[1] + ' ';
+                case PathType.LINETO: return 'L ' + coords[0] + ' ' + coords[1] + ' ';
+                case PathType.LINEH: return 'H ' + coords[0] + ' ';
+                case PathType.LINEV: return 'V ' + coords[1] + ' ';
+            }
+        };
         Path.prototype.moveTo = function (x, y) {
-            this.coordinates.push([x, y]);
             this.currentPos = [x, y];
-            this.path += 'M ' + x + ' ' + y + ' ';
+            this.dataPoints.push({ coords: [x, y], type: PathType.MOVETO });
             return this;
         };
         Path.prototype.lineTo = function (x, y) {
             this.currentPos = [x, y];
-            this.path += 'L ' + x + ' ' + y + ' ';
+            this.dataPoints.push({ coords: [x, y], type: PathType.LINETO });
             return this;
         };
         Path.prototype.LineH = function (x) {
             this.currentPos[0] = x;
-            this.path += 'H ' + x + ' ';
+            this.dataPoints.push({ coords: [x, 0], type: PathType.LINEH });
             return this;
         };
         Path.prototype.LineV = function (y) {
             this.currentPos[1] = y;
-            this.path += 'V ' + y + ' ';
+            this.dataPoints.push({ coords: [0, y], type: PathType.LINEV });
             return this;
         };
+        Path.prototype.update = function () {
+            var path = '';
+            for (var _i = 0, _a = this.dataPoints; _i < _a.length; _i++) {
+                var x = _a[_i];
+                path += this.typeString(x.type, x.coords);
+            }
+            this.path = path;
+        };
         Path.prototype.render = function (container) {
+            this.update();
             var element = container.querySelector('#' + this.id);
             if (element) {
                 element.setAttribute('d', this.path);
@@ -108,31 +157,41 @@ var graphy;
         };
         return Text;
     }(SVGComponent));
-    var XYChart = /** @class */ (function () {
-        function XYChart(div, data) {
-            this._data = data ? data : [];
-            this.div = document.getElementById(div);
-            this.dimensions = { width: this.div.offsetWidth, height: this.div.offsetHeight };
-            this.graphProps = new PathProperties();
-            this.components = new Map();
-            this.div.innerHTML = this.renderSVG();
+    var SVGBatch = /** @class */ (function (_super) {
+        __extends(SVGBatch, _super);
+        function SVGBatch(id) {
+            var _this = _super.call(this, id) || this;
+            _this._components = [];
+            return _this;
         }
-        Object.defineProperty(XYChart.prototype, "data", {
-            set: function (data) {
-                this._data = data;
+        Object.defineProperty(SVGBatch.prototype, "components", {
+            set: function (list) {
+                this._components = list;
             },
             enumerable: true,
             configurable: true
         });
-        XYChart.prototype.boundsOfData = function (dataObject) {
-            if (!dataObject)
-                return { min: 0, max: 0 };
-            var values = dataObject.map(function (el) {
-                return el.value;
-            });
-            var max = Math.max.apply(Math, values);
-            var min = Math.min.apply(Math, values);
-            return { min: min, max: max };
+        SVGBatch.prototype.render = function (container) {
+            if (!container.querySelector('#' + this.id))
+                container.innerHTML += '<g id="' + this.id + '"></g>';
+            var element = container.querySelector('#' + this.id);
+            element.innerHTML = '';
+            this._components.forEach(function (e) { return e.render(element); });
+        };
+        return SVGBatch;
+    }(SVGComponent));
+    var XYChart = /** @class */ (function () {
+        function XYChart(div) {
+            this.div = document.getElementById(div);
+            this.dimensions = { width: this.div.offsetWidth, height: this.div.offsetHeight };
+            this.components = new Map();
+            this.div.innerHTML = this.renderSVG();
+            this.dataCollection = [];
+        }
+        XYChart.prototype.createDataSet = function () {
+            var set = new DataSet();
+            this.dataCollection.push(set);
+            return set;
         };
         XYChart.prototype.renderSVG = function (content) {
             return '<svg id="' + SVG_DIV + '" ' +
@@ -142,19 +201,22 @@ var graphy;
                 '</svg>';
         };
         XYChart.prototype.createReferenceLines = function () {
+            var set = this.dataCollection[0];
+            if (!set)
+                return;
             var pathProperties = { stroke: "#dbdbdb", strokeWidth: 0.5 };
             var halfStroke = pathProperties.strokeWidth / 2;
             var scaleV = this.dimensions.height / 8;
             var scaleH = this.dimensions.width / 30;
             var dimensions = { width: this.dimensions.width - scaleH, height: this.dimensions.height - scaleV };
-            var intervalX = (dimensions.width) / this._data.length;
+            var intervalX = dimensions.width / set.data.length;
             var path = new Path('refLines', pathProperties);
-            for (var i = 1; i < this._data.length; i++) {
+            for (var i = 1; i < set.data.length; i++) {
                 path.moveTo(intervalX * i - halfStroke + scaleH, halfStroke + scaleV / 2);
                 path.LineV(this.dimensions.height - halfStroke);
             }
-            for (var i = 1; i < 10; i++) {
-                path.moveTo(scaleH + halfStroke, this.dimensions.height / 10 * i + halfStroke + scaleV / 2);
+            for (var i = 1; i < 11; i++) {
+                path.moveTo(scaleH + halfStroke, dimensions.height / 10 * i + halfStroke + scaleV / 2);
                 path.LineH(this.dimensions.width - halfStroke);
             }
             this.components.put(path.id, path);
@@ -164,35 +226,39 @@ var graphy;
             return null;
         };
         XYChart.prototype.createYHeaders = function () {
-            var bounds = this.boundsOfData(this._data);
+            var set = this.dataCollection[0];
+            if (!set)
+                return;
             var result = [];
-            var fontSize = this.dimensions.height / 30; // ratio of dimensions?
-            for (var i = 0; i < 10; i++) {
-                var content = (Math.floor(bounds.max - i * bounds.max / 10)).toString();
-                result.push(new Text(content, fontSize, { x: 0, y: (this.dimensions.height / 10 * i + fontSize / 2) + this.dimensions.height / 17 }));
+            var fontSize = this.dimensions.height / 35; // ratio of dimensions?
+            var scaleV = this.dimensions.height / 8;
+            var scaleH = this.dimensions.width / 30;
+            var dimensions = { width: this.dimensions.width - scaleH, height: this.dimensions.height - scaleV };
+            for (var i = 0; i < 11; i++) {
+                var content = (Math.floor(set.bounds().max - i * set.bounds().max / 10)).toString();
+                result.push(new Text(content, fontSize, { x: 0, y: (dimensions.height / 10 * i + fontSize / 2) + this.dimensions.height / 17 }));
             }
             return result;
         };
         XYChart.prototype.draw = function () {
-            var _this = this;
             this.createReferenceLines().render(this.div.querySelector('#' + SVG_DIV));
-            this.createGraph().render(this.div.querySelector('#' + SVG_DIV));
-            this.createYHeaders().forEach(function (el) { return el.render(_this.div.querySelector('#' + SVG_DIV)); });
+            for (var _i = 0, _a = this.dataCollection; _i < _a.length; _i++) {
+                var x = _a[_i];
+                this.createGraph(x).render(this.div.querySelector('#' + SVG_DIV));
+            }
+            //this.createYHeaders().forEach(el => el.render(this.div.querySelector('#' + SVG_DIV)));
+            var yHeaders = new SVGBatch('yHeaders');
+            yHeaders.components = this.createYHeaders();
+            yHeaders.render(this.div.querySelector('#' + SVG_DIV));
         };
         return XYChart;
     }());
-    graphy.XYChart = XYChart;
+    xycharts.XYChart = XYChart;
     var LineChart = /** @class */ (function (_super) {
         __extends(LineChart, _super);
-        function LineChart(div, data) {
-            return _super.call(this, div, data) || this;
+        function LineChart(div) {
+            return _super.call(this, div) || this;
         }
-        LineChart.prototype.addPoint = function (point, index) {
-            throw new Error("Method not implemented.");
-        };
-        LineChart.prototype.removePoint = function (index) {
-            throw new Error("Method not implemented.");
-        };
         LineChart.prototype.connectPoints = function (x, y, path) {
             path.lineTo(x, y).moveTo(x, y);
         };
@@ -204,43 +270,30 @@ var graphy;
         };
         return LineChart;
     }(XYChart));
-    graphy.LineChart = LineChart;
+    xycharts.LineChart = LineChart;
     var StepLineChart = /** @class */ (function (_super) {
         __extends(StepLineChart, _super);
-        function StepLineChart(div, data) {
-            return _super.call(this, div, data) || this;
+        function StepLineChart(div) {
+            return _super.call(this, div) || this;
         }
-        StepLineChart.prototype.addPoint = function (point, index) {
-            if (index == null) {
-                this._data.push(point);
-                return;
-            }
-            this._data.splice(index, 0, point);
-            //let graph = this.div.querySelector('#' + 'graph');
-            //graph.setAttribute('d', graph.getAttribute('d') + this.components['graph'].);
-        };
-        StepLineChart.prototype.removePoint = function (index) {
-            this._data.splice(index, 1);
-        };
-        StepLineChart.prototype.connectPoints = function (x, y, path) {
+        StepLineChart.prototype.connectPoints = function (x, y, path, set) {
             var movingUp = y < path.currentPos[1];
-            var halfStroke = this.graphProps.strokeWidth / 2;
+            var halfStroke = set.properties.pathProperties.strokeWidth / 2;
             path
                 .LineH(x)
                 .moveTo(x - halfStroke, movingUp ? path.currentPos[1] + halfStroke : path.currentPos[1] - halfStroke)
                 .LineV(movingUp ? y + halfStroke : y - halfStroke)
                 .moveTo(path.currentPos[0] - halfStroke, path.currentPos[1]);
         };
-        StepLineChart.prototype.createGraph = function () {
-            var path = new Path('graph', this.graphProps);
+        StepLineChart.prototype.createGraph = function (set) {
+            var path = new Path('graph', set.properties.pathProperties);
             var scaleV = this.dimensions.height / 8;
             var scaleH = this.dimensions.width / 30;
             var dimensions = { width: this.dimensions.width - scaleH, height: this.dimensions.height - scaleV };
-            var intervalX = (dimensions.width) / this._data.length;
-            var bounds = this.boundsOfData(this._data);
-            path.moveTo(scaleH, dimensions.height - this._data[0].value / bounds.max * dimensions.height + path.pathProperties.strokeWidth / 2 + scaleV / 2);
-            for (var i = 1; i < this._data.length; i++) {
-                this.connectPoints(intervalX * i + scaleH, dimensions.height - this._data[i].value / bounds.max * dimensions.height + scaleV / 2, path);
+            var intervalX = (dimensions.width) / set.data.length;
+            path.moveTo(scaleH, dimensions.height - set.data[0][set.yKey] / set.bounds().max * dimensions.height - path.pathProperties.strokeWidth / 2 + scaleV / 2);
+            for (var i = 1; i < set.data.length; i++) {
+                this.connectPoints(intervalX * i + scaleH, dimensions.height - set.data[i][set.yKey] / set.bounds().max * dimensions.height + scaleV / 2, path, set);
             }
             path.LineH(dimensions.width + path.pathProperties.strokeWidth / 2 + scaleH);
             this.components.put(path.id, path);
@@ -248,6 +301,6 @@ var graphy;
         };
         return StepLineChart;
     }(XYChart));
-    graphy.StepLineChart = StepLineChart;
-})(graphy || (graphy = {})); // Namespace end
+    xycharts.StepLineChart = StepLineChart;
+})(xycharts || (xycharts = {})); // Namespace end
 //# sourceMappingURL=index.js.map

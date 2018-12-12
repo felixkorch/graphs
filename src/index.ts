@@ -1,4 +1,4 @@
-namespace graphy {
+namespace xycharts {
     type Color = "#FFFFFF" | "#FF0000" | "#0000FF";
     const WHITE: Color = "#FFFFFF";
     const RED: Color = "#FF0000";
@@ -13,7 +13,7 @@ namespace graphy {
             this.object = {};
         }
 
-        put(key: K, value: V): void {
+        put(key: K, value: V) {
             this.object[key] = value;
         }
 
@@ -32,52 +32,109 @@ namespace graphy {
             this.id = id ? id : '';
         }
     }
-    
+
     class PathProperties {
-        stroke: string = "BLUE";
-        strokeWidth: number = 3;
+        public stroke: string = "BLUE";
+        public strokeWidth: number = 3;
     }
     
-    class Path extends SVGComponent {
-        pathProperties: PathProperties;
-        path: string;
-        coordinates:[ number, number ][];
-        currentPos: [ number, number ];
-    
-        constructor(id: string, pathProperties?: PathProperties, path?: string) {
-            super(id);
-            this.path = path ? path : ''; 
-            this.pathProperties = pathProperties ? pathProperties : new PathProperties();
-            this.coordinates = [];
-            this.currentPos = [0, 0];
+    class Properties {
+        public pathProperties: PathProperties;
+    }
+
+    export class DataSet {
+        public data: any[];
+        public properties: Properties; 
+        public xKey: string;
+        public yKey: string;
+
+        constructor(data?: any) {
+            this.data = data ? data : [];
+            this.properties = new Properties();
+            this.xKey = '';
+            this.yKey = '';
         }
+
+        public addData(item: any, remove: number) {
+            this.data.splice(0, remove);
+            this.data.push(item);
+        }
+
+        public bounds() {
+            if(!this.data)
+                return { min: 0, max: 0 };
+            let values = this.data.map(e => e.value);
+            let max = Math.max(...values);
+            let min = Math.min(...values);
+            return { min: min, max: max };
+        }
+
+    }
+
+    enum PathType {
+        MOVETO,
+        LINETO,
+        LINEH,
+        LINEV
+    }
+
+    class Path extends SVGComponent {
+
+        public pathProperties: PathProperties;
+        protected path: string;
+        public currentPos: [ number, number ];
+        protected dataPoints: { coords: [number, number], type: PathType }[];
     
+        constructor(id: string, pathProperties?: PathProperties) {
+            super(id);
+            this.pathProperties = pathProperties ? pathProperties : new PathProperties();
+            this.currentPos = [0, 0];
+            this.dataPoints = [];
+        }
+
+        protected typeString(type: PathType, coords: [number, number]) {
+            switch(type) {
+                case PathType.MOVETO: return 'M ' + coords[0] + ' ' + coords[1] + ' ';
+                case PathType.LINETO: return 'L ' + coords[0] + ' ' + coords[1] + ' ';
+                case PathType.LINEH: return 'H ' + coords[0] + ' ';
+                case PathType.LINEV: return 'V ' + coords[1] + ' ';
+            }
+        }
+
         public moveTo(x: number, y: number) {
-            this.coordinates.push([x, y]);
             this.currentPos = [x, y];
-            this.path += 'M ' + x + ' ' + y + ' ';
+            this.dataPoints.push({ coords: [x, y], type: PathType.MOVETO });
             return this;
         }
     
         public lineTo(x: number, y: number) {
             this.currentPos = [x, y];
-            this.path += 'L ' + x + ' ' + y + ' ';
+            this.dataPoints.push({ coords: [x, y], type: PathType.LINETO });
             return this;
         }
     
         public LineH(x: number) {
             this.currentPos[0] = x;
-            this.path += 'H ' + x + ' ';
+            this.dataPoints.push({ coords: [x, 0], type: PathType.LINEH });
             return this;
         }
     
         public LineV(y: number) {
             this.currentPos[1] = y;
-            this.path += 'V ' + y + ' ';
+            this.dataPoints.push({ coords: [0, y], type: PathType.LINEV });
             return this;
+        }
+
+        public update() {
+            let path = '';
+            for(let x of this.dataPoints) {
+                path += this.typeString(x.type, x.coords);
+            }
+            this.path = path;
         }
     
         public render(container: HTMLElement) {
+            this.update();
             let element = container.querySelector('#' + this.id);
             if(element) {
                 element.setAttribute('d', this.path);
@@ -111,50 +168,52 @@ namespace graphy {
                         'x="' + this.position.x + '" ' +
                         'y="' + this.position.y + '" ' + 'class="small">'
                         + this.content +
-                    '</text>'
+                    '</text>';
         }
     
     }
-    
-    interface DataObject {
-        key: any;
-        value: number;
+
+    class SVGBatch extends SVGComponent {
+        private _components: SVGComponent[];
+
+        set components(list: SVGComponent[]) {
+            this._components = list;
+        }
+
+        constructor(id: string) {
+            super(id);
+            this._components = [];
+        }
+        public render(container: HTMLElement) {
+            if(!container.querySelector('#' + this.id))
+                container.innerHTML += '<g id="' + this.id + '"></g>';
+            let element = container.querySelector('#' + this.id);
+            element.innerHTML = '';
+            this._components.forEach( e => e.render(element as HTMLElement) );
+        }
     }
 
     export abstract class XYChart {
-        protected _data: DataObject[];
+        protected dataCollection: DataSet[];
         protected div: HTMLElement;
         protected dimensions: { width: number, height: number };
         protected components: Map<string, SVGComponent>;
-        public graphProps: PathProperties;
     
-        constructor(div: string, data?: DataObject[]) {
-            this._data = data ? data : [];
+        constructor(div: string) {
             this.div = document.getElementById(div);
             this.dimensions = { width: this.div.offsetWidth, height: this.div.offsetHeight };
-            this.graphProps = new PathProperties();
             this.components = new Map();
             this.div.innerHTML = this.renderSVG();
+            this.dataCollection = [];
         }
 
-        protected abstract createGraph(): Path;
-        protected abstract addPoint(point: DataObject, index?: number): void;
-        protected abstract removePoint(index: number): void;
-        protected abstract connectPoints(x: number, y: number, path: Path): void;
+        protected abstract createGraph(set: DataSet): Path;
+        protected abstract connectPoints(x: number, y: number, path: Path, set: DataSet): void;
     
-        set data(data: DataObject[]) {
-            this._data = data;
-        }
-    
-        protected boundsOfData(dataObject: DataObject[]) {
-            if(!dataObject)
-                return { min: 0, max: 0 };
-            let values = dataObject.map(el => {
-                return el.value;
-            });
-            let max = Math.max(...values);
-            let min = Math.min(...values);
-            return { min: min, max: max };
+        public createDataSet() {
+            let set = new DataSet();
+            this.dataCollection.push(set);
+            return set;
         }
     
         protected renderSVG(content?: string) {
@@ -166,21 +225,24 @@ namespace graphy {
         }
 
         protected createReferenceLines(): Path {
+            let set = this.dataCollection[0];
+            if(!set)
+                return
             let pathProperties = { stroke: "#dbdbdb", strokeWidth: 0.5 };
             let halfStroke = pathProperties.strokeWidth / 2;
             let scaleV = this.dimensions.height / 8;
             let scaleH = this.dimensions.width / 30;
             let dimensions = { width: this.dimensions.width - scaleH, height: this.dimensions.height - scaleV };
-            let intervalX = (dimensions.width) / this._data.length;
+            let intervalX = dimensions.width / set.data.length;
             let path = new Path('refLines', pathProperties);
     
-            for(let i = 1; i < this._data.length; i++) {
+            for(let i = 1; i < set.data.length; i++) {
                 path.moveTo(intervalX * i - halfStroke + scaleH, halfStroke + scaleV / 2);
                 path.LineV(this.dimensions.height - halfStroke);
             }
     
-            for(let i = 1; i < 10; i++) {
-                path.moveTo(scaleH + halfStroke, this.dimensions.height / 10 * i + halfStroke + scaleV / 2);
+            for(let i = 1; i < 11; i++) {
+                path.moveTo(scaleH + halfStroke, dimensions.height / 10 * i + halfStroke + scaleV / 2);
                 path.LineH(this.dimensions.width - halfStroke);
             }
     
@@ -193,36 +255,39 @@ namespace graphy {
         }
 
         protected createYHeaders(): Text[] {
-            let bounds =  this.boundsOfData(this._data);
+            let set = this.dataCollection[0];
+            if(!set)
+                return;
             let result = [];
-            let fontSize = this.dimensions.height / 30; // ratio of dimensions?
-            for(let i = 0; i < 10; i++) {
-                let content = (Math.floor(bounds.max - i * bounds.max / 10)).toString();
-                result.push(new Text(content, fontSize, { x: 0, y: (this.dimensions.height / 10 * i + fontSize / 2) + this.dimensions.height / 17 }));
+            let fontSize = this.dimensions.height / 35; // ratio of dimensions?
+            let scaleV = this.dimensions.height / 8;
+            let scaleH = this.dimensions.width / 30;
+            let dimensions = { width: this.dimensions.width - scaleH, height: this.dimensions.height - scaleV };
+            for(let i = 0; i < 11; i++) {
+                let content = (Math.floor(set.bounds().max - i * set.bounds().max / 10)).toString();
+                result.push(new Text(content, fontSize, { x: 0, y: (dimensions.height / 10 * i + fontSize / 2) + this.dimensions.height / 17 }));
             }
             return result;
         }
     
         public draw() {
             this.createReferenceLines().render(this.div.querySelector('#' + SVG_DIV));
-            this.createGraph().render(this.div.querySelector('#' + SVG_DIV));
-            this.createYHeaders().forEach(el => el.render(this.div.querySelector('#' + SVG_DIV)));
+            for(let x of this.dataCollection)
+                this.createGraph(x).render(this.div.querySelector('#' + SVG_DIV));
+            //this.createYHeaders().forEach(el => el.render(this.div.querySelector('#' + SVG_DIV)));
+            let yHeaders = new SVGBatch('yHeaders');
+            yHeaders.components = this.createYHeaders();
+            yHeaders.render(this.div.querySelector('#' + SVG_DIV));
         }
 
     }
 
     export class LineChart extends XYChart {
 
-        constructor(div: string, data?: DataObject[]) {
-            super(div, data);
+        constructor(div: string) {
+            super(div);
         }
 
-        protected addPoint(point: DataObject, index?: number): void {
-            throw new Error("Method not implemented.");
-        }
-        protected removePoint(index: number): void {
-            throw new Error("Method not implemented.");
-        }
         protected connectPoints(x: number, y: number, path: Path) {
             path.lineTo(x, y).moveTo(x, y);
         }
@@ -238,27 +303,13 @@ namespace graphy {
     
     export class StepLineChart extends XYChart {
     
-        constructor(div: string, data?: DataObject[]) {
-            super(div, data);
-        }
-    
-        public addPoint(point: DataObject, index?: number) {
-            if (index == null) {
-                this._data.push(point);
-                return;
-            }
-            this._data.splice(index, 0, point);
-            //let graph = this.div.querySelector('#' + 'graph');
-            //graph.setAttribute('d', graph.getAttribute('d') + this.components['graph'].);
-        }
-    
-        public removePoint(index: number) {
-            this._data.splice(index, 1);
+        constructor(div: string) {
+            super(div);
         }
 
-        protected connectPoints(x: number, y: number, path: Path): void {
+        protected connectPoints(x: number, y: number, path: Path, set: DataSet) {
             let movingUp = y < path.currentPos[1];
-            let halfStroke = this.graphProps.strokeWidth / 2;
+            let halfStroke = set.properties.pathProperties.strokeWidth / 2;
     
             path
                 .LineH(x)
@@ -267,17 +318,16 @@ namespace graphy {
                 .moveTo(path.currentPos[0] - halfStroke, path.currentPos[1]);
         }
     
-        protected createGraph(): Path {
-            let path = new Path('graph', this.graphProps);
+        protected createGraph(set: DataSet): Path {
+            let path = new Path('graph', set.properties.pathProperties);
             let scaleV = this.dimensions.height / 8;
             let scaleH = this.dimensions.width / 30;
             let dimensions = { width: this.dimensions.width - scaleH, height: this.dimensions.height - scaleV };
-            let intervalX = (dimensions.width) / this._data.length;
-            let bounds = this.boundsOfData(this._data);
+            let intervalX = (dimensions.width) / set.data.length;
     
-            path.moveTo(scaleH, dimensions.height - this._data[0].value / bounds.max * dimensions.height + path.pathProperties.strokeWidth / 2 + scaleV / 2 );
-            for(let i = 1; i < this._data.length; i++) {
-                this.connectPoints(intervalX * i + scaleH, dimensions.height - this._data[i].value / bounds.max * dimensions.height + scaleV / 2, path);
+            path.moveTo(scaleH, dimensions.height - set.data[0][set.yKey] / set.bounds().max * dimensions.height - path.pathProperties.strokeWidth / 2 + scaleV / 2 );
+            for(let i = 1; i < set.data.length; i++) {
+                this.connectPoints(intervalX * i + scaleH, dimensions.height - set.data[i][set.yKey] / set.bounds().max * dimensions.height + scaleV / 2, path, set);
             }
             path.LineH(dimensions.width + path.pathProperties.strokeWidth / 2 + scaleH);
             this.components.put(path.id, path);
