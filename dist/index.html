@@ -7,50 +7,45 @@
 </header>
 <body>
     <button type="button" onclick="handleClick()">Add point</button>
-    <div id="container" style="width: 800px; height: 400px; border: 1px solid black" />
+    <div id="container" style="width: 1400px; height: 800px; border: 1px solid black" />
 </body>
 </html>
 
 <script>
 
     var points = [];
-    points.push({ "key": "a", "value": 0 });
-    points.push({ "key": "b", "value": 70 });
-    points.push({ "key": "c", "value": 300 });
-    points.push({ "key": "d", "value": 30 });
-    points.push({ "key": "e", "value": 20 });
-    points.push({ "key": "f", "value": 10 });
-    points.push({ "key": "g", "value": 10 });
-    points.push({ "key": "h", "value": 20 });
-    points.push({ "key": "h", "value": 240 });
-    points.push({ "key": "h", "value": 50 });
-    points.push({ "key": "h", "value": 70 });
-    points.push({ "key": "f", "value": 10 });
-    points.push({ "key": "g", "value": 500 });
-    points.push({ "key": "h", "value": 20 });
-    points.push({ "key": "h", "value": 20 });
-    points.push({ "key": "h", "value": 50 });
-    points.push({ "key": "h", "value": 10 });
-    points.push({ "key": "h", "value": 20 });
-    points.push({ "key": "h", "value": 50 });
-    points.push({ "key": "h", "value": 10 });
-    points.push({ "key": "h", "value": 20 });
-    points.push({ "key": "h", "value": 50 });
-    points.push({ "key": "h", "value": 10 });
-    points.push({ "key": "h", "value": 20 });
-    points.push({ "key": "h", "value": 70 });
-    points.push({ "key": "h", "value": 90 });
+    points.push({ "key": new Date(), "value": 0 });
+    points.push({ "key": new Date(), "value": 70 });
+    points.push({ "key": new Date(), "value": 20 });
+    points.push({ "key": new Date(), "value": 30 });
+    points.push({ "key": new Date(), "value": 10 });
+    points.push({ "key": new Date(), "value": 300 });
+    points.push({ "key": new Date(), "value": 10 });
+    points.push({ "key": new Date(), "value": 20 });
+    points.push({ "key": new Date(), "value": 240 });
+    points.push({ "key": new Date(), "value": 50 });
+    points.push({ "key": new Date(), "value": 70 });
+    points.push({ "key": new Date(), "value": 10 });
+    points.push({ "key": new Date(), "value": 500 });
+    points.push({ "key": new Date(), "value": 20 });
+    points.push({ "key": new Date(), "value": 20 });
+    points.push({ "key": new Date(), "value": 50 });
+    points.push({ "key": new Date(), "value": 10 });
+    points.push({ "key": new Date(), "value": 20 });
+    points.push({ "key": new Date(), "value": 50 });
+    points.push({ "key": new Date(), "value": 10 });
 
     var chart = new xycharts.StepLineChart("container");
     var dataset = chart.createDataSet();
     dataset.data = points;
-    dataset.properties.pathProperties = { "stroke": "#67B6DB", "strokeWidth": 2 };
+    dataset.properties.pathProperties = { "stroke": "#67B6DB", "strokeWidth": 3 };
+    dataset.properties.density = 11;
     dataset.xKey = "key";
     dataset.yKey = "value";
     chart.draw(); 
 
     function handleClick() {
-        dataset.addData({ "key": "a", "value": Math.random() * 500 }, 1);
+        dataset.addData({ "key": new Date(), "value": Math.random() * 500 }, 1);
         chart.draw();
     }
 

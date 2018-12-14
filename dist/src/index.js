@@ -62,9 +62,11 @@ var xycharts;
             if (!this.data)
                 return { min: 0, max: 0 };
             var values = this.data.map(function (e) { return e.value; });
-            var max = Math.max.apply(Math, values);
-            var min = Math.min.apply(Math, values);
-            return { min: min, max: max };
+            return { min: Math.min.apply(Math, values), max: Math.max.apply(Math, values) };
+        };
+        DataSet.prototype.toHourMinute = function () {
+            var _this = this;
+            return this.data.map(function (e) { return new Date(e[_this.xKey]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); });
         };
         return DataSet;
     }());
@@ -85,7 +87,7 @@ var xycharts;
             _this.dataPoints = [];
             return _this;
         }
-        Path.prototype.typeString = function (type, coords) {
+        Path.typeString = function (type, coords) {
             switch (type) {
                 case PathType.MOVETO: return 'M ' + coords[0] + ' ' + coords[1] + ' ';
                 case PathType.LINETO: return 'L ' + coords[0] + ' ' + coords[1] + ' ';
@@ -117,7 +119,7 @@ var xycharts;
             var path = '';
             for (var _i = 0, _a = this.dataPoints; _i < _a.length; _i++) {
                 var x = _a[_i];
-                path += this.typeString(x.type, x.coords);
+                path += Path.typeString(x.type, x.coords);
             }
             this.path = path;
         };
@@ -183,7 +185,9 @@ var xycharts;
     var XYChart = /** @class */ (function () {
         function XYChart(div) {
             this.div = document.getElementById(div);
-            this.dimensions = { width: this.div.offsetWidth, height: this.div.offsetHeight };
+            this.offsetX = this.div.offsetWidth * 0.04;
+            this.offsetY = this.div.offsetHeight * 0.05;
+            this.dimensions = { width: this.div.offsetWidth - this.offsetX, height: this.div.offsetHeight - this.offsetY };
             this.components = new Map();
             this.div.innerHTML = this.renderSVG();
             this.dataCollection = [];
@@ -194,62 +198,72 @@ var xycharts;
             return set;
         };
         XYChart.prototype.renderSVG = function (content) {
-            return '<svg id="' + SVG_DIV + '" ' +
-                'preserveAspectRatio="xMinYMin none" ' +
+            return '<svg id="' + "SVG_DIV" + '" ' +
                 'width="100%" height="100%" ' +
-                'viewBox="0 0 ' + this.dimensions.width + ' ' + this.dimensions.height + '">' +
+                'viewBox=" 0 0 ' + this.div.offsetWidth + ' ' + this.div.offsetHeight + '">' +
+                '<g id="' + SVG_DIV + '" transform="translate(' + this.offsetX / 2 + ' ' + this.offsetY / 2 + ')" ></g>' +
                 '</svg>';
         };
         XYChart.prototype.createReferenceLines = function () {
             var set = this.dataCollection[0];
             if (!set)
                 return;
+            var density = set.properties.density;
             var pathProperties = { stroke: "#dbdbdb", strokeWidth: 0.5 };
             var halfStroke = pathProperties.strokeWidth / 2;
-            var scaleV = this.dimensions.height / 8;
-            var scaleH = this.dimensions.width / 30;
-            var dimensions = { width: this.dimensions.width - scaleH, height: this.dimensions.height - scaleV };
-            var intervalX = dimensions.width / set.data.length;
+            var interval = this.dimensions.width / (set.data.length + 1);
             var path = new Path('refLines', pathProperties);
-            for (var i = 1; i < set.data.length; i++) {
-                path.moveTo(intervalX * i - halfStroke + scaleH, halfStroke + scaleV / 2);
+            for (var i = 0; i < set.data.length - 1; i++) {
+                path.moveTo(interval * (i + 2) - halfStroke, halfStroke);
                 path.LineV(this.dimensions.height - halfStroke);
             }
-            for (var i = 1; i < 11; i++) {
-                path.moveTo(scaleH + halfStroke, dimensions.height / 10 * i + halfStroke + scaleV / 2);
+            for (var i = 0; i < density - 1; i++) {
+                path.moveTo(halfStroke + interval, this.dimensions.height / density * (i + 1) + halfStroke);
                 path.LineH(this.dimensions.width - halfStroke);
             }
             this.components.put(path.id, path);
             return path;
         };
         XYChart.prototype.createXHeaders = function () {
-            return null;
+            var set = this.dataCollection[0];
+            if (!set)
+                return;
+            var result = [];
+            var fontSize = this.dimensions.height / 46;
+            var intervalX = this.dimensions.width / (set.data.length + 1);
+            var dates = set.toHourMinute();
+            for (var i = 0; i < set.data.length; i++) {
+                result.push(new Text(dates[i], fontSize, { x: intervalX * (i + 1), y: this.dimensions.height }));
+            }
+            return result;
         };
         XYChart.prototype.createYHeaders = function () {
             var set = this.dataCollection[0];
             if (!set)
                 return;
             var result = [];
-            var fontSize = this.dimensions.height / 35; // ratio of dimensions?
-            var scaleV = this.dimensions.height / 8;
-            var scaleH = this.dimensions.width / 30;
-            var dimensions = { width: this.dimensions.width - scaleH, height: this.dimensions.height - scaleV };
-            for (var i = 0; i < 11; i++) {
-                var content = (Math.floor(set.bounds().max - i * set.bounds().max / 10)).toString();
-                result.push(new Text(content, fontSize, { x: 0, y: (dimensions.height / 10 * i + fontSize / 2) + this.dimensions.height / 17 }));
+            var fontSize = this.dimensions.height / 35;
+            var density = set.properties.density;
+            var interval = this.dimensions.height / density;
+            for (var i = 0; i < density; i++) {
+                var content = (Math.floor(set.bounds().max - i * set.bounds().max / (density - 1))).toString();
+                result.push(new Text(content, fontSize, { x: 0, y: interval * i + fontSize * 0.35 }));
             }
             return result;
         };
         XYChart.prototype.draw = function () {
-            this.createReferenceLines().render(this.div.querySelector('#' + SVG_DIV));
+            var mainSvg = this.div.querySelector('#' + SVG_DIV);
+            this.createReferenceLines().render(mainSvg);
             for (var _i = 0, _a = this.dataCollection; _i < _a.length; _i++) {
-                var x = _a[_i];
-                this.createGraph(x).render(this.div.querySelector('#' + SVG_DIV));
+                var set = _a[_i];
+                this.createGraph(set).render(mainSvg);
             }
-            //this.createYHeaders().forEach(el => el.render(this.div.querySelector('#' + SVG_DIV)));
             var yHeaders = new SVGBatch('yHeaders');
             yHeaders.components = this.createYHeaders();
-            yHeaders.render(this.div.querySelector('#' + SVG_DIV));
+            yHeaders.render(mainSvg);
+            var xHeaders = new SVGBatch('xHeaders');
+            xHeaders.components = this.createXHeaders();
+            xHeaders.render(mainSvg);
         };
         return XYChart;
     }());
@@ -287,15 +301,13 @@ var xycharts;
         };
         StepLineChart.prototype.createGraph = function (set) {
             var path = new Path('graph', set.properties.pathProperties);
-            var scaleV = this.dimensions.height / 8;
-            var scaleH = this.dimensions.width / 30;
-            var dimensions = { width: this.dimensions.width - scaleH, height: this.dimensions.height - scaleV };
-            var intervalX = (dimensions.width) / set.data.length;
-            path.moveTo(scaleH, dimensions.height - set.data[0][set.yKey] / set.bounds().max * dimensions.height - path.pathProperties.strokeWidth / 2 + scaleV / 2);
+            var intervalX = this.dimensions.width / (set.data.length + 1);
+            var intervalY = this.dimensions.height / set.properties.density;
+            path.moveTo(intervalX, this.dimensions.height - set.data[0][set.yKey] / set.bounds().max * this.dimensions.height - intervalY);
             for (var i = 1; i < set.data.length; i++) {
-                this.connectPoints(intervalX * i + scaleH, dimensions.height - set.data[i][set.yKey] / set.bounds().max * dimensions.height + scaleV / 2, path, set);
+                this.connectPoints(intervalX * (i + 1), (this.dimensions.height - intervalY) - set.data[i][set.yKey] / set.bounds().max * (this.dimensions.height - intervalY), path, set);
             }
-            path.LineH(dimensions.width + path.pathProperties.strokeWidth / 2 + scaleH);
+            path.LineH(this.dimensions.width);
             this.components.put(path.id, path);
             return path;
         };

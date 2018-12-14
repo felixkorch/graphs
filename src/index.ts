@@ -40,6 +40,7 @@ namespace xycharts {
     
     class Properties {
         public pathProperties: PathProperties;
+        public density: number;
     }
 
     export class DataSet {
@@ -64,9 +65,11 @@ namespace xycharts {
             if(!this.data)
                 return { min: 0, max: 0 };
             let values = this.data.map(e => e.value);
-            let max = Math.max(...values);
-            let min = Math.min(...values);
-            return { min: min, max: max };
+            return { min: Math.min(...values), max: Math.max(...values) };
+        }
+
+        public toHourMinute() { // Fix options
+            return this.data.map(e => new Date(e[this.xKey]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
         }
 
     }
@@ -92,7 +95,7 @@ namespace xycharts {
             this.dataPoints = [];
         }
 
-        protected typeString(type: PathType, coords: [number, number]) {
+        protected static typeString(type: PathType, coords: [number, number]) {
             switch(type) {
                 case PathType.MOVETO: return 'M ' + coords[0] + ' ' + coords[1] + ' ';
                 case PathType.LINETO: return 'L ' + coords[0] + ' ' + coords[1] + ' ';
@@ -128,7 +131,7 @@ namespace xycharts {
         public update() {
             let path = '';
             for(let x of this.dataPoints) {
-                path += this.typeString(x.type, x.coords);
+                path += Path.typeString(x.type, x.coords);
             }
             this.path = path;
         }
@@ -198,10 +201,17 @@ namespace xycharts {
         protected div: HTMLElement;
         protected dimensions: { width: number, height: number };
         protected components: Map<string, SVGComponent>;
+
+        protected readonly offsetY: number;
+        protected readonly offsetX: number;
     
         constructor(div: string) {
             this.div = document.getElementById(div);
-            this.dimensions = { width: this.div.offsetWidth, height: this.div.offsetHeight };
+
+            this.offsetX = this.div.offsetWidth * 0.04;
+            this.offsetY = this.div.offsetHeight * 0.05;
+            this.dimensions = { width: this.div.offsetWidth - this.offsetX, height:  this.div.offsetHeight - this.offsetY };
+
             this.components = new Map();
             this.div.innerHTML = this.renderSVG();
             this.dataCollection = [];
@@ -217,10 +227,10 @@ namespace xycharts {
         }
     
         protected renderSVG(content?: string) {
-            return  '<svg id="' + SVG_DIV + '" '  +
-                        'preserveAspectRatio="xMinYMin none" ' +
+            return  '<svg id="' + "SVG_DIV" + '" '  +
                         'width="100%" height="100%" ' +
-                        'viewBox="0 0 ' + this.dimensions.width + ' ' + this.dimensions.height + '">' +
+                        'viewBox=" 0 0 ' + this.div.offsetWidth + ' ' + this.div.offsetHeight + '">' +
+                        '<g id="' + SVG_DIV + '" transform="translate(' + this.offsetX / 2 + ' ' + this.offsetY / 2 + ')" ></g>' +
                     '</svg>';
         }
 
@@ -228,21 +238,20 @@ namespace xycharts {
             let set = this.dataCollection[0];
             if(!set)
                 return
-            let pathProperties = { stroke: "#dbdbdb", strokeWidth: 0.5 };
-            let halfStroke = pathProperties.strokeWidth / 2;
-            let scaleV = this.dimensions.height / 8;
-            let scaleH = this.dimensions.width / 30;
-            let dimensions = { width: this.dimensions.width - scaleH, height: this.dimensions.height - scaleV };
-            let intervalX = dimensions.width / set.data.length;
+            
+            const density = set.properties.density;
+            const pathProperties = { stroke: "#dbdbdb", strokeWidth: 0.5 };
+            const halfStroke = pathProperties.strokeWidth / 2;
+            const interval = this.dimensions.width / (set.data.length + 1);
             let path = new Path('refLines', pathProperties);
     
-            for(let i = 1; i < set.data.length; i++) {
-                path.moveTo(intervalX * i - halfStroke + scaleH, halfStroke + scaleV / 2);
+            for(let i = 0; i < set.data.length - 1; i++) {
+                path.moveTo(interval * (i + 2) - halfStroke, halfStroke);
                 path.LineV(this.dimensions.height - halfStroke);
             }
     
-            for(let i = 1; i < 11; i++) {
-                path.moveTo(scaleH + halfStroke, dimensions.height / 10 * i + halfStroke + scaleV / 2);
+            for(let i = 0; i < density - 1; i++) {
+                path.moveTo(halfStroke + interval, this.dimensions.height / density * (i + 1) + halfStroke);
                 path.LineH(this.dimensions.width - halfStroke);
             }
     
@@ -250,34 +259,54 @@ namespace xycharts {
             return path;
         }
 
-        protected createXHeaders(): Path {
-            return null;
+        protected createXHeaders(): Text[] {
+            let set = this.dataCollection[0];
+            if(!set)
+                return;
+
+            let result = [];
+            const fontSize = this.dimensions.height / 46;
+            const intervalX = this.dimensions.width / (set.data.length + 1);
+            const dates = set.toHourMinute();
+
+            for(let i = 0; i < set.data.length; i++) {
+                result.push(new Text(dates[i], fontSize, { x: intervalX * (i + 1), y: this.dimensions.height }));
+            }
+            return result;
         }
 
         protected createYHeaders(): Text[] {
             let set = this.dataCollection[0];
             if(!set)
                 return;
+
             let result = [];
-            let fontSize = this.dimensions.height / 35; // ratio of dimensions?
-            let scaleV = this.dimensions.height / 8;
-            let scaleH = this.dimensions.width / 30;
-            let dimensions = { width: this.dimensions.width - scaleH, height: this.dimensions.height - scaleV };
-            for(let i = 0; i < 11; i++) {
-                let content = (Math.floor(set.bounds().max - i * set.bounds().max / 10)).toString();
-                result.push(new Text(content, fontSize, { x: 0, y: (dimensions.height / 10 * i + fontSize / 2) + this.dimensions.height / 17 }));
+            const fontSize = this.dimensions.height / 35;
+            const density = set.properties.density;
+            const interval = this.dimensions.height / density;
+
+            for(let i = 0; i < density; i++) {
+                let content = (Math.floor(set.bounds().max - i * set.bounds().max / (density - 1))).toString();
+                result.push(new Text(content, fontSize, { x: 0, y: interval * i + fontSize * 0.35 }));
             }
             return result;
         }
     
         public draw() {
-            this.createReferenceLines().render(this.div.querySelector('#' + SVG_DIV));
-            for(let x of this.dataCollection)
-                this.createGraph(x).render(this.div.querySelector('#' + SVG_DIV));
-            //this.createYHeaders().forEach(el => el.render(this.div.querySelector('#' + SVG_DIV)));
+            let mainSvg: HTMLElement = this.div.querySelector('#' + SVG_DIV);
+
+            this.createReferenceLines().render(mainSvg);
+
+            for(let set of this.dataCollection)
+                this.createGraph(set).render(mainSvg);
+
             let yHeaders = new SVGBatch('yHeaders');
             yHeaders.components = this.createYHeaders();
-            yHeaders.render(this.div.querySelector('#' + SVG_DIV));
+            yHeaders.render(mainSvg);
+
+            let xHeaders = new SVGBatch('xHeaders');
+            xHeaders.components = this.createXHeaders();
+            xHeaders.render(mainSvg);
         }
 
     }
@@ -320,16 +349,14 @@ namespace xycharts {
     
         protected createGraph(set: DataSet): Path {
             let path = new Path('graph', set.properties.pathProperties);
-            let scaleV = this.dimensions.height / 8;
-            let scaleH = this.dimensions.width / 30;
-            let dimensions = { width: this.dimensions.width - scaleH, height: this.dimensions.height - scaleV };
-            let intervalX = (dimensions.width) / set.data.length;
+            const intervalX = this.dimensions.width / (set.data.length + 1)
+            const intervalY = this.dimensions.height / set.properties.density;
     
-            path.moveTo(scaleH, dimensions.height - set.data[0][set.yKey] / set.bounds().max * dimensions.height - path.pathProperties.strokeWidth / 2 + scaleV / 2 );
+            path.moveTo(intervalX, this.dimensions.height - set.data[0][set.yKey] / set.bounds().max * this.dimensions.height - intervalY );
             for(let i = 1; i < set.data.length; i++) {
-                this.connectPoints(intervalX * i + scaleH, dimensions.height - set.data[i][set.yKey] / set.bounds().max * dimensions.height + scaleV / 2, path, set);
+                this.connectPoints(intervalX * (i + 1), (this.dimensions.height - intervalY) - set.data[i][set.yKey] / set.bounds().max * (this.dimensions.height - intervalY), path, set);
             }
-            path.LineH(dimensions.width + path.pathProperties.strokeWidth / 2 + scaleH);
+            path.LineH(this.dimensions.width);
             this.components.put(path.id, path);
             return path;
         }
