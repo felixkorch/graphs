@@ -1,4 +1,4 @@
-namespace xycharts {
+export namespace xycharts {
     type Color = "#FFFFFF" | "#FF0000" | "#0000FF";
     const WHITE: Color = "#FFFFFF";
     const RED: Color = "#FF0000";
