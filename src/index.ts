@@ -363,3 +363,5 @@ namespace xycharts {
     }
     
     } // Namespace end
+
+    export default xycharts;
