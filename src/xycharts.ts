@@ -1,4 +1,4 @@
-export namespace xycharts {
+namespace xycharts {
     type Color = "#FFFFFF" | "#FF0000" | "#0000FF";
     const WHITE: Color = "#FFFFFF";
     const RED: Color = "#FF0000";
@@ -64,7 +64,7 @@ export namespace xycharts {
         public bounds() {
             if(!this.data)
                 return { min: 0, max: 0 };
-            let values = this.data.map(e => e.value);
+            let values = this.data.map(e => e[this.yKey]);
             return { min: Math.min(...values), max: Math.max(...values) };
         }
 
@@ -286,7 +286,7 @@ export namespace xycharts {
             const interval = this.dimensions.height / density;
 
             for(let i = 0; i < density; i++) {
-                let content = (Math.floor(set.bounds().max - i * set.bounds().max / (density - 1))).toString();
+                let content = (Math.floor(set.bounds().max - i * (set.bounds().max - set.bounds().min) / (density - 1))).toString();
                 result.push(new Text(content, fontSize, { x: 0, y: interval * i + fontSize * 0.35 }));
             }
             return result;
@@ -352,9 +352,9 @@ export namespace xycharts {
             const intervalX = this.dimensions.width / (set.data.length + 1)
             const intervalY = this.dimensions.height / set.properties.density;
     
-            path.moveTo(intervalX, this.dimensions.height - set.data[0][set.yKey] / set.bounds().max * this.dimensions.height - intervalY );
+            path.moveTo(intervalX, this.dimensions.height - (set.data[0][set.yKey] - set.bounds().min) / set.bounds().max * this.dimensions.height - intervalY );
             for(let i = 1; i < set.data.length; i++) {
-                this.connectPoints(intervalX * (i + 1), (this.dimensions.height - intervalY) - set.data[i][set.yKey] / set.bounds().max * (this.dimensions.height - intervalY), path, set);
+                this.connectPoints(intervalX * (i + 1), (this.dimensions.height - intervalY) - (set.data[i][set.yKey] - set.bounds().min) / (set.bounds().max - set.bounds().min) * (this.dimensions.height - intervalY), path, set);
             }
             path.LineH(this.dimensions.width);
             this.components.put(path.id, path);
@@ -363,5 +363,3 @@ export namespace xycharts {
     }
     
     } // Namespace end
-
-    export default xycharts;

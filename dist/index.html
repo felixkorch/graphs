@@ -1,39 +1,41 @@
 <html>
 <header>
     <title>Charts</title>
-    <meta charset="utf-8"/>
-    <script src="src/index.js"></script>
-    
+    <meta charset="utf-8" />
+    <script src="src/xycharts.js"></script>
+
 </header>
+
 <body>
     <button type="button" onclick="handleClick()">Add point</button>
     <div id="container" style="width: 1400px; height: 800px; border: 1px solid black" />
 </body>
+
 </html>
 
 <script>
 
     var points = [];
-    points.push({ "key": new Date(), "value": 0 });
-    points.push({ "key": new Date(), "value": 70 });
-    points.push({ "key": new Date(), "value": 20 });
     points.push({ "key": new Date(), "value": 30 });
-    points.push({ "key": new Date(), "value": 10 });
+    points.push({ "key": new Date(), "value": 70 });
+    points.push({ "key": new Date(), "value": 30 });
+    points.push({ "key": new Date(), "value": 30 });
+    points.push({ "key": new Date(), "value": 30 });
     points.push({ "key": new Date(), "value": 300 });
-    points.push({ "key": new Date(), "value": 10 });
-    points.push({ "key": new Date(), "value": 20 });
+    points.push({ "key": new Date(), "value": 30 });
+    points.push({ "key": new Date(), "value": 30 });
     points.push({ "key": new Date(), "value": 240 });
     points.push({ "key": new Date(), "value": 50 });
     points.push({ "key": new Date(), "value": 70 });
-    points.push({ "key": new Date(), "value": 10 });
+    points.push({ "key": new Date(), "value": 30 });
     points.push({ "key": new Date(), "value": 500 });
-    points.push({ "key": new Date(), "value": 20 });
-    points.push({ "key": new Date(), "value": 20 });
+    points.push({ "key": new Date(), "value": 320 });
+    points.push({ "key": new Date(), "value": 30 });
+    points.push({ "key": new Date(), "value": 300 });
+    points.push({ "key": new Date(), "value": 30 });
+    points.push({ "key": new Date(), "value": 30 });
+    points.push({ "key": new Date(), "value": 30 });
     points.push({ "key": new Date(), "value": 50 });
-    points.push({ "key": new Date(), "value": 10 });
-    points.push({ "key": new Date(), "value": 20 });
-    points.push({ "key": new Date(), "value": 50 });
-    points.push({ "key": new Date(), "value": 10 });
 
     var chart = new xycharts.StepLineChart("container");
     var dataset = chart.createDataSet();
@@ -42,7 +44,7 @@
     dataset.properties.density = 11;
     dataset.xKey = "key";
     dataset.yKey = "value";
-    chart.draw(); 
+    chart.draw();
 
     function handleClick() {
         dataset.addData({ "key": new Date(), "value": Math.random() * 500 }, 1);
