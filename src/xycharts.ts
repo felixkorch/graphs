@@ -1,8 +1,9 @@
 namespace xycharts {
-    type Color = "#FFFFFF" | "#FF0000" | "#0000FF";
-    const WHITE: Color = "#FFFFFF";
-    const RED: Color = "#FF0000";
-    const BLUE: Color = "#0000FF";
+    type Color = "#FFFFFF" | "#FF0000" | "#0000FF" | "#67B6DB";
+    export const WHITE: Color = "#FFFFFF";
+    export const RED: Color = "#FF0000";
+    export const BLUE: Color = "#0000FF";
+    export const NICE_BLUE: Color = "#67B6DB";
 
     class Map<K, V> {
         key: K;
@@ -21,6 +22,9 @@ namespace xycharts {
             return this.object[key];
         }
     }
+
+    type Point = { x: number, y: number };
+    type Rect = { x: number, y: number, width: number, height: number };
 
     const SVG_DIV = 'main';
 
@@ -135,7 +139,7 @@ namespace xycharts {
             }
             this.path = path;
         }
-    
+
         public render(container: HTMLElement) {
             this.update();
             let element = container.querySelector('#' + this.id);
@@ -143,12 +147,14 @@ namespace xycharts {
                 element.setAttribute('d', this.path);
                 return;
             }
+
             container.innerHTML +=
                 '<path id="' + this.id + '" d="' + this.path + '"' +
                 'stroke='+ this.pathProperties.stroke + ' stroke-width=' + this.pathProperties.strokeWidth + ' />';
+            container.querySelector('#' + this.id).classList.add('transition');
         }
     }
-    
+
     class Text extends SVGComponent {
         content: string;
         fontSize: number;
@@ -208,17 +214,26 @@ namespace xycharts {
         constructor(div: string) {
             this.div = document.getElementById(div);
 
-            this.offsetX = this.div.offsetWidth * 0.04;
+            this.offsetX = this.div.offsetWidth * 0.05; // Arbitrary constant
             this.offsetY = this.div.offsetHeight * 0.05;
             this.dimensions = { width: this.div.offsetWidth - this.offsetX, height:  this.div.offsetHeight - this.offsetY };
 
             this.components = new Map();
-            this.div.innerHTML = this.renderSVG();
             this.dataCollection = [];
+
+            this.renderSVG(this.div);
+
+            // Temporary -------------------------------
+            let head = document.head;
+            let style = document.createElement('style');
+            style.type = 'text/css';
+            style.innerHTML = '.transition { transition: all .4s ease-out; }';
+            head.appendChild(style);
+            // -----------------------------------------
+
         }
 
-        protected abstract createGraph(set: DataSet): Path;
-        protected abstract connectPoints(x: number, y: number, path: Path, set: DataSet): void;
+        protected abstract connectPoints(from: Point, to: Point, path: Path, set: DataSet): void;
     
         public createDataSet() {
             let set = new DataSet();
@@ -226,86 +241,114 @@ namespace xycharts {
             return set;
         }
     
-        protected renderSVG(content?: string) {
-            return  '<svg id="' + "SVG_DIV" + '" '  +
+        protected renderSVG(container: HTMLElement) {
+            
+            /*
+            let svg = document.createElement('svg');
+            svg.setAttribute('width', '100%');
+            svg.setAttribute('height', '100%')
+            svg.setAttribute('viewBox', '0 0 ' + this.div.offsetWidth + ' ' + this.div.offsetHeight);
+
+            let mainContainer = document.createElement('g');
+            mainContainer.id = SVG_DIV;
+            mainContainer.setAttribute('transform', 'translate(' + this.offsetX / 2 + ' ' + this.offsetY / 2 + ')');
+
+            svg.appendChild(mainContainer);
+            container.appendChild(svg); */
+
+            container.innerHTML = 
+                    '<svg id="' + "SVG_DIV" + '" '  +
                         'width="100%" height="100%" ' +
                         'viewBox=" 0 0 ' + this.div.offsetWidth + ' ' + this.div.offsetHeight + '">' +
                         '<g id="' + SVG_DIV + '" transform="translate(' + this.offsetX / 2 + ' ' + this.offsetY / 2 + ')" ></g>' +
                     '</svg>';
         }
 
-        protected createReferenceLines(): Path {
-            let set = this.dataCollection[0];
-            if(!set)
-                return
+        protected createReferenceLines(bounds: Rect, set: DataSet): Path {
             
             const density = set.properties.density;
             const pathProperties = { stroke: "#dbdbdb", strokeWidth: 0.5 };
-            const halfStroke = pathProperties.strokeWidth / 2;
-            const interval = this.dimensions.width / (set.data.length + 1);
             let path = new Path('refLines', pathProperties);
     
-            for(let i = 0; i < set.data.length - 1; i++) {
-                path.moveTo(interval * (i + 2) - halfStroke, halfStroke);
-                path.LineV(this.dimensions.height - halfStroke);
+            for(let i = 1; i < density; i++) {
+                path.moveTo(bounds.x, i * bounds.height / density)
+                    .LineH(bounds.x + bounds.width);
             }
-    
-            for(let i = 0; i < density - 1; i++) {
-                path.moveTo(halfStroke + interval, this.dimensions.height / density * (i + 1) + halfStroke);
-                path.LineH(this.dimensions.width - halfStroke);
+
+            for(let i = 1; i < set.data.length; i++) {
+                path.moveTo(bounds.width / set.data.length * i + bounds.x, bounds.y)
+                    .LineV(bounds.y + bounds.height);
             }
     
             this.components.put(path.id, path);
             return path;
         }
 
-        protected createXHeaders(): Text[] {
-            let set = this.dataCollection[0];
-            if(!set)
-                return;
-
+        protected createXHeaders(bounds: Rect, set: DataSet): Text[] {
             let result = [];
-            const fontSize = this.dimensions.height / 46;
-            const intervalX = this.dimensions.width / (set.data.length + 1);
+            const fontSize = this.dimensions.height / 40; // arbitrary
+            const interval = bounds.width / set.data.length;
             const dates = set.toHourMinute();
 
             for(let i = 0; i < set.data.length; i++) {
-                result.push(new Text(dates[i], fontSize, { x: intervalX * (i + 1), y: this.dimensions.height }));
+                result.push(new Text(dates[i], fontSize, { x: bounds.x + interval * i, y: this.dimensions.height }));
             }
             return result;
         }
 
-        protected createYHeaders(): Text[] {
-            let set = this.dataCollection[0];
-            if(!set)
-                return;
-
+        protected createYHeaders(bounds: Rect, set: DataSet): Text[] {
             let result = [];
-            const fontSize = this.dimensions.height / 35;
+            const fontSize = this.dimensions.height / 35; // arbitrary
             const density = set.properties.density;
-            const interval = this.dimensions.height / density;
+            const interval = bounds.height / density;
 
-            for(let i = 0; i < density; i++) {
-                let content = (Math.floor(set.bounds().max - i * (set.bounds().max - set.bounds().min) / (density - 1))).toString();
-                result.push(new Text(content, fontSize, { x: 0, y: interval * i + fontSize * 0.35 }));
+            for(let i = 0; i < density + 1; i++) {
+                let content = (Math.floor(set.bounds().max - i * (set.bounds().max - set.bounds().min) / density)).toString();
+                result.push(new Text(content, fontSize, { x: 0, y: interval * i + fontSize / 4 }));
             }
             return result;
+        }
+
+        protected generateCoordinates(bounds: Rect, set: DataSet) {
+            const intervalX = bounds.width / set.data.length
+            let coords = [];
+            for(let i = 0; i < set.data.length; i++) {
+                coords.push({ x: intervalX * i + bounds.x,
+                              y: bounds.height - (set.data[i][set.yKey] - set.bounds().min) / (set.bounds().max - set.bounds().min) * bounds.height });
+            }
+            coords.push({ x: this.dimensions.width, y: coords[set.data.length - 1].y });
+
+            return coords;
+        }
+    
+        protected createGraph(bounds: Rect, set: DataSet): Path {
+            let path = new Path('graph', set.properties.pathProperties);
+            let coords = this.generateCoordinates(bounds, set);
+
+            for(let i = 0; i < coords.length - 1; i++) {
+                let from = { x: coords[i].x, y: coords[i].y };
+                let to = { x: coords[i + 1].x, y: coords[i + 1].y };
+                this.connectPoints(from, to, path, set);
+            }
+
+            this.components.put(path.id, path);
+            return path;
         }
     
         public draw() {
             let mainSvg: HTMLElement = this.div.querySelector('#' + SVG_DIV);
 
-            this.createReferenceLines().render(mainSvg);
+            let bounds: Rect = { x: this.offsetX, y: 0, width: this.dimensions.width - this.offsetX, height: this.dimensions.height - this.offsetY };
 
-            for(let set of this.dataCollection)
-                this.createGraph(set).render(mainSvg);
+            this.createReferenceLines(bounds, this.dataCollection[0]).render(mainSvg);
+            this.createGraph(bounds, this.dataCollection[0]).render(mainSvg);
 
             let yHeaders = new SVGBatch('yHeaders');
-            yHeaders.components = this.createYHeaders();
+            yHeaders.components = this.createYHeaders(bounds, this.dataCollection[0]);
             yHeaders.render(mainSvg);
 
             let xHeaders = new SVGBatch('xHeaders');
-            xHeaders.components = this.createXHeaders();
+            xHeaders.components = this.createXHeaders(bounds, this.dataCollection[0]);
             xHeaders.render(mainSvg);
         }
 
@@ -317,15 +360,11 @@ namespace xycharts {
             super(div);
         }
 
-        protected connectPoints(x: number, y: number, path: Path) {
-            path.lineTo(x, y).moveTo(x, y);
-        }
-
-        protected createGraph(): Path {
-            let path = new Path('graph');
-            path.moveTo(0, 0);
-            path.lineTo(100, 100);
-            return path;
+        protected connectPoints(from: Point, to: Point, path: Path, set: DataSet) {
+            for(let i = 0; i < set.data.length; i++) {
+                path.moveTo(from.x, from.y)
+                    .lineTo(to.x, to.y);
+            }
         }
 
     }
@@ -336,29 +375,15 @@ namespace xycharts {
             super(div);
         }
 
-        protected connectPoints(x: number, y: number, path: Path, set: DataSet) {
-            let movingUp = y < path.currentPos[1];
+        protected connectPoints(from: Point, to: Point, path: Path, set: DataSet) {
+            let movingUp = to.y < from.y;
             let halfStroke = set.properties.pathProperties.strokeWidth / 2;
-    
+            
             path
-                .LineH(x)
-                .moveTo(x - halfStroke, movingUp ? path.currentPos[1] + halfStroke : path.currentPos[1] - halfStroke)
-                .LineV(movingUp ? y + halfStroke : y - halfStroke)
-                .moveTo(path.currentPos[0] - halfStroke, path.currentPos[1]);
-        }
-    
-        protected createGraph(set: DataSet): Path {
-            let path = new Path('graph', set.properties.pathProperties);
-            const intervalX = this.dimensions.width / (set.data.length + 1)
-            const intervalY = this.dimensions.height / set.properties.density;
-    
-            path.moveTo(intervalX, this.dimensions.height - (set.data[0][set.yKey] - set.bounds().min) / set.bounds().max * this.dimensions.height - intervalY );
-            for(let i = 1; i < set.data.length; i++) {
-                this.connectPoints(intervalX * (i + 1), (this.dimensions.height - intervalY) - (set.data[i][set.yKey] - set.bounds().min) / (set.bounds().max - set.bounds().min) * (this.dimensions.height - intervalY), path, set);
-            }
-            path.LineH(this.dimensions.width);
-            this.components.put(path.id, path);
-            return path;
+                .moveTo(from.x - halfStroke, from.y)
+                .LineH(to.x)
+                .moveTo(to.x - halfStroke, movingUp ? from.y + halfStroke : from.y - halfStroke)
+                .LineV(movingUp ? to.y - halfStroke : to.y + halfStroke)
         }
     }
     

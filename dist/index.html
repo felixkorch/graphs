@@ -2,7 +2,7 @@
 <header>
     <title>Charts</title>
     <meta charset="utf-8" />
-    <script src="src/xycharts.js"></script>
+    <script src="xycharts.js"></script>
 
 </header>
 
@@ -40,7 +40,7 @@
     var chart = new xycharts.StepLineChart("container");
     var dataset = chart.createDataSet();
     dataset.data = points;
-    dataset.properties.pathProperties = { "stroke": "#67B6DB", "strokeWidth": 3 };
+    dataset.properties.pathProperties = { "stroke": xycharts.NICE_BLUE, "strokeWidth": 2 };
     dataset.properties.density = 11;
     dataset.xKey = "key";
     dataset.yKey = "value";
@@ -49,6 +49,10 @@
     function handleClick() {
         dataset.addData({ "key": new Date(), "value": Math.random() * 500 }, 1);
         chart.draw();
+    }
+
+    function mouseover() {
+        console.log("asd");
     }
 
 </script>
