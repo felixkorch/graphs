@@ -68,7 +68,7 @@ var xycharts;
         };
         DataSet.prototype.toHourMinute = function () {
             var _this = this;
-            return this.data.map(function (e) { return new Date(e[_this.xKey]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); });
+            return this.data.map(function (e) { return new Date(e[_this.xKey]).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }); }); // TODO: Add Locale specifics
         };
         return DataSet;
     }());

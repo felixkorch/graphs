@@ -72,8 +72,8 @@ namespace xycharts {
             return { min: Math.min(...values), max: Math.max(...values) };
         }
 
-        public toHourMinute() { // Fix options
-            return this.data.map(e => new Date(e[this.xKey]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+        public toHourMinute() { // Add options
+            return this.data.map(e => new Date(e[this.xKey]).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit', hour12: false })); // TODO: Add Locale specifics
         }
 
     }
